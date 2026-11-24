@@ -249,8 +249,8 @@ def _admin_session_token(request: Request) -> str:
 
 
 def _require_admin(request: Request) -> str:
-    if len(_admin_password()) < 16:
-        raise GatewayError(503, "Админ-панель отключена: задайте ADMIN_PASSWORD длиной не менее 16 символов", code="admin_not_configured")
+    if len(_admin_password()) < 3:
+        raise GatewayError(503, "Админ-панель отключена: задайте ADMIN_PASSWORD длиной не менее 3 символов", code="admin_not_configured")
     token = _admin_session_token(request)
     if not db.admin_session_valid(token):
         raise GatewayError(401, "Войдите в админ-панель", code="admin_not_authenticated")
@@ -271,15 +271,15 @@ def _set_admin_cookie(response: JSONResponse, request: Request, token: str) -> N
 
 @router.get("/api/admin/session")
 async def admin_session(request: Request):
-    authenticated = len(_admin_password()) >= 16 and db.admin_session_valid(_admin_session_token(request))
+    authenticated = len(_admin_password()) >= 3 and db.admin_session_valid(_admin_session_token(request))
     return {"authenticated": authenticated}
 
 
 @router.post("/api/admin/login")
 async def admin_login(request: Request):
     configured_password = _admin_password()
-    if len(configured_password) < 16:
-        raise GatewayError(503, "Админ-панель отключена: задайте ADMIN_PASSWORD длиной не менее 16 символов", code="admin_not_configured")
+    if len(configured_password) < 3:
+        raise GatewayError(503, "Админ-панель отключена: задайте ADMIN_PASSWORD длиной не менее 3 символов", code="admin_not_configured")
 
     client_ip = request.client.host if request.client else "unknown"
     limits.hit(f"admin-login:{client_ip}", 5, "Слишком много попыток входа в админ-панель.")
