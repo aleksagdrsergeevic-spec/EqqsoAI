@@ -5,8 +5,12 @@ to these endpoints. Accounts are login + password (no e-mail, no confirmations)
 and the session is an HttpOnly cookie, so a stolen script cannot read it.
 """
 
+import hmac
+import math
 import os
 import re
+import secrets
+import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -16,6 +20,8 @@ from .config import DEFAULT_MODEL, available_models, catalog
 from .errors import GatewayError
 
 COOKIE = "fg_session"
+ADMIN_COOKIE = "eqqsoai_admin"
+ADMIN_SESSION_TTL = 60 * 60 * 8
 LOGIN_RE = re.compile(r"^[\w.\-@]{3,64}$", re.UNICODE)
 LOGIN_RPM = 20
 
@@ -214,6 +220,8 @@ async def revoke_key(request: Request, key_id: int):
 @router.post("/api/redeem")
 async def redeem(request: Request):
     user = _require_user(request)
+    client_ip = request.client.host if request.client else "unknown"
+    limits.hit(f"redeem:{client_ip}", 10, "Слишком много попыток активации кода.")
     data = await _body(request)
     code = data.get("code")
     if not isinstance(code, str) or not code.strip():
@@ -224,3 +232,101 @@ async def redeem(request: Request):
         raise GatewayError(400, "Код недействителен или уже использован", code="bad_code")
 
     return {"amount": amount, "account": _account_payload(request, user)}
+
+
+
+# --------------------------------------------------------------------------
+# owner-only admin panel
+# --------------------------------------------------------------------------
+
+
+def _admin_password() -> str:
+    return os.environ.get("ADMIN_PASSWORD", "")
+
+
+def _admin_session_token(request: Request) -> str:
+    return request.headers.get("x-admin-session") or request.cookies.get(ADMIN_COOKIE, "")
+
+
+def _require_admin(request: Request) -> str:
+    if len(_admin_password()) < 16:
+        raise GatewayError(503, "Админ-панель отключена: задайте ADMIN_PASSWORD длиной не менее 16 символов", code="admin_not_configured")
+    token = _admin_session_token(request)
+    if not db.admin_session_valid(token):
+        raise GatewayError(401, "Войдите в админ-панель", code="admin_not_authenticated")
+    return token
+
+
+def _set_admin_cookie(response: JSONResponse, request: Request, token: str) -> None:
+    response.set_cookie(
+        ADMIN_COOKIE,
+        token,
+        max_age=ADMIN_SESSION_TTL,
+        httponly=True,
+        samesite="strict",
+        secure=request.url.scheme == "https",
+        path="/api/admin",
+    )
+
+
+@router.get("/api/admin/session")
+async def admin_session(request: Request):
+    authenticated = len(_admin_password()) >= 16 and db.admin_session_valid(_admin_session_token(request))
+    return {"authenticated": authenticated}
+
+
+@router.post("/api/admin/login")
+async def admin_login(request: Request):
+    configured_password = _admin_password()
+    if len(configured_password) < 16:
+        raise GatewayError(503, "Админ-панель отключена: задайте ADMIN_PASSWORD длиной не менее 16 символов", code="admin_not_configured")
+
+    client_ip = request.client.host if request.client else "unknown"
+    limits.hit(f"admin-login:{client_ip}", 5, "Слишком много попыток входа в админ-панель.")
+    data = await _body(request)
+    password = data.get("password")
+    if not isinstance(password, str) or not hmac.compare_digest(
+        password.encode("utf-8"), configured_password.encode("utf-8")
+    ):
+        raise GatewayError(401, "Неверный пароль администратора", code="bad_admin_password")
+
+    token = secrets.token_urlsafe(32)
+    db.create_admin_session(token, time.time() + ADMIN_SESSION_TTL)
+    response = JSONResponse({"ok": True, "token": token})
+    _set_admin_cookie(response, request, token)
+    return response
+
+
+@router.post("/api/admin/logout")
+async def admin_logout(request: Request):
+    db.drop_admin_session(_admin_session_token(request))
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(ADMIN_COOKIE, path="/api/admin", samesite="strict")
+    return response
+
+
+@router.get("/api/admin/codes")
+async def admin_codes(request: Request, limit: int = 50):
+    _require_admin(request)
+    return {"codes": db.recent_codes(limit)}
+
+
+@router.post("/api/admin/codes")
+async def create_admin_codes(request: Request):
+    _require_admin(request)
+    data = await _body(request)
+    amount = data.get("amount")
+    count = data.get("count", 1)
+    if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+        raise GatewayError(400, "Сумма TKN должна быть положительным числом", param="amount")
+    try:
+        amount = float(amount)
+    except (OverflowError, ValueError):
+        raise GatewayError(400, "Сумма TKN должна быть положительным числом", param="amount")
+    if not math.isfinite(amount) or amount <= 0:
+        raise GatewayError(400, "Сумма TKN должна быть положительным числом", param="amount")
+    if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 100:
+        raise GatewayError(400, "Количество кодов должно быть от 1 до 100", param="count")
+
+    codes = [db.make_code(amount) for _ in range(count)]
+    return {"codes": [{"code": code, "amount": amount} for code in codes]}

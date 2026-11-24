@@ -5,6 +5,7 @@ a shop with a few hundred users does not need more than that. Every write goes
 through a short transaction; WAL keeps reads fast while a request is logging.
 """
 
+import hashlib
 import json
 import os
 import secrets
@@ -50,6 +51,12 @@ CREATE TABLE IF NOT EXISTS access_codes (
     created_at REAL NOT NULL,
     used_by    INTEGER REFERENCES users(id),
     used_at    REAL
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    token_hash TEXT PRIMARY KEY,
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS usage_log (
@@ -153,6 +160,38 @@ def drop_session(token: str) -> None:
         conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
 
 
+def _admin_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_admin_session(token: str, expires_at: float) -> None:
+    now = time.time()
+    with db() as conn:
+        conn.execute("DELETE FROM admin_sessions WHERE expires_at <= ?", (now,))
+        conn.execute(
+            "INSERT INTO admin_sessions (token_hash, created_at, expires_at) VALUES (?, ?, ?)",
+            (_admin_token_hash(token), now, expires_at),
+        )
+
+
+def admin_session_valid(token: str) -> bool:
+    if not token:
+        return False
+    with db() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM admin_sessions WHERE token_hash = ? AND expires_at > ?",
+            (_admin_token_hash(token), time.time()),
+        ).fetchone()
+    return row is not None
+
+
+def drop_admin_session(token: str) -> None:
+    if not token:
+        return
+    with db() as conn:
+        conn.execute("DELETE FROM admin_sessions WHERE token_hash = ?", (_admin_token_hash(token),))
+
+
 # --------------------------------------------------------------------------
 # api keys
 # --------------------------------------------------------------------------
@@ -222,13 +261,33 @@ def redeem(code: str, user_id: int):
 
 
 def make_code(amount: float) -> str:
-    code = "WN-" + secrets.token_hex(4).upper()
+    code = "WN-" + secrets.token_hex(12).upper()
     with db() as conn:
         conn.execute(
             "INSERT INTO access_codes (code, amount, created_at) VALUES (?, ?, ?)",
             (code, amount, time.time()),
         )
     return code
+
+
+def recent_codes(limit: int = 50) -> list:
+    limit = max(1, min(200, int(limit)))
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT c.code, c.amount, c.created_at, u.login AS used_by "
+            "FROM access_codes c LEFT JOIN users u ON u.id = c.used_by "
+            "ORDER BY c.created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [
+        {
+            "code": row["code"],
+            "amount": float(row["amount"]),
+            "created_at": float(row["created_at"]),
+            "used_by": row["used_by"],
+        }
+        for row in rows
+    ]
 
 
 def charge(user_id: int, model: str, prompt_tokens: float, completion_tokens: float, cost: float) -> None:

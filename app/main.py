@@ -95,6 +95,14 @@ async def index():
     return FileResponse(page, media_type="text/html")
 
 
+@app.get("/admin")
+async def admin_page():
+    page = os.path.join(STATIC_DIR, "admin.html")
+    if not os.path.exists(page):
+        return JSONResponse({"name": "EqqsoAI Admin", "hint": "static/admin.html is missing"}, status_code=404)
+    return FileResponse(page, media_type="text/html")
+
+
 @app.get("/health")
 async def health():
     return {

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08060f">
+<title>Админ-панель — EqqsoAI</title>
+<link rel="stylesheet" href="/static/admin.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<main class="admin-shell">
+  <header class="admin-header">
+    <a class="brand" href="/" aria-label="EqqsoAI"><span class="brand-mark">Eqqso</span><span class="brand-ai">Ai</span></a>
+    <span class="header-label">Админ-панель</span>
+    <button class="button button-quiet hidden" id="logoutButton" type="button">Выйти</button>
+  </header>
+
+  <section class="panel login-panel" id="loginPanel">
+    <p class="eyebrow">Доступ владельца</p>
+    <h1>Вход в админ-панель</h1>
+    <p class="muted">Введите пароль администратора, заданный в <code>ADMIN_PASSWORD</code> на сервере.</p>
+    <form id="loginForm">
+      <label for="adminPassword">Пароль</label>
+      <input id="adminPassword" name="password" type="password" autocomplete="current-password" required>
+      <button class="button button-primary full" id="loginButton" type="submit">Войти</button>
+      <p class="message" id="loginMessage" role="status"></p>
+    </form>
+    <p class="hint">Пароль должен быть уникальным, не короче 16 символов. Используйте панель только по HTTPS.</p>
+  </section>
+
+  <section class="hidden" id="adminPanel">
+    <div class="page-title">
+      <div>
+        <p class="eyebrow">Управление балансом</p>
+        <h1>Коды пополнения</h1>
+        <p class="muted">Создайте одноразовые коды: пользователь активирует код в профиле, и TKN поступят на его баланс.</p>
+      </div>
+    </div>
+
+    <section class="panel create-panel">
+      <form id="codeForm" class="code-form">
+        <div class="field">
+          <label for="amount">Сумма в TKN для одного кода</label>
+          <input id="amount" name="amount" type="number" min="0.01" step="any" value="50000" required>
+        </div>
+        <div class="field count-field">
+          <label for="count">Количество кодов</label>
+          <input id="count" name="count" type="number" min="1" max="100" step="1" value="1" required>
+        </div>
+        <button class="button button-primary create-button" id="createButton" type="submit">Создать коды</button>
+      </form>
+      <p class="message" id="createMessage" role="status"></p>
+      <div class="issued hidden" id="issuedPanel">
+        <div class="issued-head">
+          <div><h2>Новые коды</h2><p class="muted">Скопируйте и передайте покупателям. Каждый код можно активировать один раз.</p></div>
+          <button class="button button-quiet" id="copyAllButton" type="button">Копировать все</button>
+        </div>
+        <ul class="issued-list" id="issuedList"></ul>
+      </div>
+    </section>
+
+    <section class="panel history-panel">
+      <div class="history-head">
+        <div><h2>Последние коды</h2><p class="muted">История последних 100 созданных кодов и их статус.</p></div>
+        <button class="button button-quiet" id="refreshButton" type="button">Обновить</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Код</th><th>Зачисление</th><th>Создан</th><th>Статус</th><th></th></tr></thead>
+          <tbody id="codesBody"></tbody>
+        </table>
+      </div>
+      <p class="empty hidden" id="emptyCodes">Кодов пока нет.</p>
+    </section>
+  </section>
+
+  <div class="toast hidden" id="toast" role="status"></div>
+  <footer>Код пополнения только добавляет TKN. API-ключ пользователь получает в своём кабинете.</footer>
+</main>
+<script src="/static/admin.js"></script>
+</body>
+</html>
