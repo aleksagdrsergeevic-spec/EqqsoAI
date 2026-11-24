@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08060f">
+<title>EqqsoAI — один API ко всем моделям</title>
+<meta name="description" content="Один ключ и один базовый адрес для GPT, Claude, Gemini, Qwen и других моделей. Оплата токенами, без подписки.">
+<link rel="stylesheet" href="/static/styles.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<header class="hdr">
+  <a class="brand" href="#top" aria-label="EqqsoAI">
+    <span class="logo"><span class="logo-badge">Eqqso</span><span class="logo-ai">Ai</span></span>
+  </a>
+
+  <nav class="hdr-nav">
+    <a href="#models">Модели</a>
+    <a href="#start">Подключение</a>
+    <a href="https://t.me/EqqsoAiBot" target="_blank" rel="noopener">Поддержка ↗</a>
+  </nav>
+
+  <div class="hdr-actions">
+    <button class="btn btn-outline" id="loginBtn">Войти</button>
+    <div class="hdr-user hidden" id="userActions">
+      <button class="btn btn-outline" id="cabinetBtn">Кабинет</button>
+      <button class="btn btn-quiet" id="logoutBtn">Выйти</button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="hero-art" aria-hidden="true">
+      <div class="orb"></div>
+      <div class="orb orb-2"></div>
+      <div class="glow"></div>
+    </div>
+
+    <div class="hero-copy">
+      <span class="badge">OpenAI · Anthropic · Gemini</span>
+      <h1>
+        <span class="hero-line">Один ключ.</span>
+        <span class="hero-line grad">Все модели.</span>
+      </h1>
+      <p class="hero-lead">
+        GPT, Claude, Gemini и открытые модели — через один базовый адрес
+        и один <code>sk-</code> ключ. Платите за токены, а не за подписку.
+      </p>
+      <div class="hero-cta">
+        <button class="btn btn-primary" id="heroCta">Создать аккаунт</button>
+        <a class="link-accent" href="#models">К моделям ↓</a>
+      </div>
+    </div>
+
+    <div class="hero-base">
+      <span class="base-label">Базовый адрес API</span>
+      <code id="baseUrl">—</code>
+      <button class="copy-btn" data-copy="baseUrl">Копировать</button>
+    </div>
+  </section>
+
+  <section class="section" id="models">
+    <div class="section-head">
+      <h2>Модели</h2>
+      <p class="section-note">
+        Коэффициент — цена 1000 токенов в TKN. Токены из кеша считаются
+        за половину.
+      </p>
+    </div>
+
+    <div class="filters">
+      <div class="pills" id="familyFilters"></div>
+      <input class="search" id="modelSearch" type="search" placeholder="Поиск по ID" autocomplete="off">
+    </div>
+
+    <div class="model-grid" id="modelGrid"></div>
+
+    <div class="grid-foot">
+      <span id="modelCount" class="muted"></span>
+      <button class="link-accent" id="toggleAll">Показать все модели ↓</button>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="start">
+    <div class="start-grid">
+      <div>
+        <h2>Первый запрос</h2>
+        <ol class="steps">
+          <li>Создайте аккаунт — на пробу сразу начислим токены.</li>
+          <li>Скопируйте свой <code>sk-</code> ключ и подставьте базовый адрес в клиенте.</li>
+          <li>Выберите ID модели и отправьте запрос.</li>
+        </ol>
+        <button class="btn btn-primary" id="heroCta2">Перейти в кабинет</button>
+      </div>
+
+      <div class="code-panel">
+        <div class="code-tabs">
+          <div class="tabs" id="codeTabs">
+            <button class="tab active" data-tab="curl">cURL</button>
+            <button class="tab" data-tab="cursor">Cursor</button>
+            <button class="tab" data-tab="cline">Cline</button>
+          </div>
+          <button class="link-accent" id="copyCode">Копировать</button>
+        </div>
+        <pre class="code-body"><code id="codeBody"></code></pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="ftr">
+  <div class="ftr-brand">
+    <span class="logo small"><span class="logo-badge">Eqqso</span><span class="logo-ai">Ai</span></span>
+  </div>
+  <div class="ftr-links">
+    <a href="#models">Модели</a>
+    <a href="https://t.me/EqqsoAiBot" target="_blank" rel="noopener">Канал ↗</a>
+    <a href="https://t.me/EqqsoAiBot" target="_blank" rel="noopener">Поддержка ↗</a>
+  </div>
+</footer>
+
+<!-- ===================== cabinet ===================== -->
+<section class="cabinet hidden" id="cabinet">
+  <div class="cabinet-head">
+    <div>
+      <h1>Кабинет</h1>
+      <p class="muted">Ключ, баланс и расход токенов.</p>
+    </div>
+    <div class="who">
+      <span class="avatar" id="avatar">?</span>
+      <span id="whoLogin">—</span>
+    </div>
+  </div>
+
+  <div class="pills cabinet-tabs" id="cabinetTabs">
+    <button class="pill active" data-tab="overview">Обзор</button>
+    <button class="pill" data-tab="models">Модели</button>
+    <button class="pill" data-tab="history">История</button>
+  </div>
+
+  <div class="cab-panel" id="tab-overview">
+    <div class="card card-balance">
+      <span class="card-label">Доступный баланс</span>
+      <div class="balance"><span id="balanceValue">0</span><span class="unit">TKN</span></div>
+      <button class="btn btn-primary" id="topUpBtn">Активировать код</button>
+    </div>
+
+    <div class="card">
+      <div class="field-row">
+        <span class="card-label">Базовый адрес</span>
+        <button class="link-accent" data-copy="cabinetBase">Копировать</button>
+      </div>
+      <code class="mono block" id="cabinetBase">—</code>
+
+      <div class="field-row top">
+        <span class="card-label">Ваши ключи</span>
+        <button class="link-accent" id="newKeyBtn">Создать ключ</button>
+      </div>
+      <div id="keyList" class="key-list"></div>
+    </div>
+
+    <div class="card">
+      <h3>Активируйте доступ</h3>
+      <p class="muted small">Введите код после оплаты. Код пополняет баланс токенами.</p>
+      <div class="inline-form">
+        <input id="codeInput" placeholder="WN-XXXXXXXX" autocomplete="off" autocapitalize="characters">
+        <button class="btn btn-primary" id="redeemBtn">Активировать</button>
+      </div>
+      <p class="error" id="redeemError"></p>
+    </div>
+
+    <div class="card">
+      <div class="field-row">
+        <span class="card-label">Расход токенов</span>
+        <button class="link-accent" data-goto="history">Все запросы</button>
+      </div>
+      <div class="spend">
+        <div class="spend-big"><span id="spendTotal">0</span><span class="unit">TKN</span></div>
+        <div class="spend-mini">
+          <div><b id="spend24">0</b><span>за 24 часа</span></div>
+          <div><b id="spendReqs">0</b><span>запросов</span></div>
+          <div><b id="spendAvg">0</b><span>в среднем</span></div>
+        </div>
+      </div>
+      <div class="chart" id="overviewChart"></div>
+      <p class="muted small">последние 14 дней</p>
+    </div>
+  </div>
+
+  <div class="cab-panel hidden" id="tab-models">
+    <div class="filters">
+      <div class="pills" id="cabFamilyFilters"></div>
+      <input class="search" id="cabModelSearch" type="search" placeholder="Поиск модели…" autocomplete="off">
+    </div>
+    <div class="model-grid" id="cabModelGrid"></div>
+  </div>
+
+  <div class="cab-panel hidden" id="tab-history">
+    <h2 class="panel-title">История списаний</h2>
+
+    <div class="stats-row">
+      <div><span>Потрачено всего</span><b><span id="hTotal">0</span> <i>TKN</i></b></div>
+      <div><span>За 24 часа</span><b><span id="hDay">0</span></b><em><span id="hDayReqs">0</span> запросов</em></div>
+      <div><span>Запросов</span><b><span id="hReqs">0</span></b><em>в среднем <span id="hAvg">0</span></em></div>
+      <div><span>Макс. запрос</span><b><span id="hMax">0</span> <i>TKN</i></b></div>
+    </div>
+
+    <div class="card">
+      <h3>Расход за 14 дней</h3>
+      <div class="chart" id="historyChart"></div>
+    </div>
+
+    <div class="card">
+      <h3>По моделям</h3>
+      <div id="byModel" class="by-model"></div>
+    </div>
+
+    <div class="card">
+      <div class="field-row">
+        <h3>Операции</h3>
+        <button class="btn btn-quiet" id="opsRefresh">Обновить</button>
+      </div>
+      <input class="search wide" id="opsFilter" placeholder="Фильтр по модели…" autocomplete="off">
+      <table class="ops">
+        <thead><tr><th>Модель</th><th>Вход / выход</th><th>Время</th><th class="right">Списано</th></tr></thead>
+        <tbody id="opsBody"></tbody>
+      </table>
+      <div class="ops-foot"><span id="opsCount" class="muted">0 запросов</span><span class="muted">Последние 100</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== modals ===================== -->
+<div class="modal-wrap hidden" id="authModal">
+  <div class="modal">
+    <button class="modal-x" data-close="authModal">×</button>
+    <span class="logo"><span class="logo-badge">Eqqso</span><span class="logo-ai">Ai</span></span>
+    <h2 id="authTitle">Войти в кабинет</h2>
+
+    <div class="seg" id="authSeg">
+      <button class="seg-btn active" data-mode="login">Вход</button>
+      <button class="seg-btn" data-mode="register">Регистрация</button>
+    </div>
+
+    <label for="authLogin">Логин</label>
+    <input id="authLogin" autocomplete="username" maxlength="64" autocapitalize="none">
+    <label for="authPassword">Пароль</label>
+    <input id="authPassword" type="password" autocomplete="current-password" maxlength="256">
+
+    <button class="btn btn-primary block" id="authSubmit">Войти</button>
+    <p class="error" id="authError"></p>
+
+    <p class="muted small center">
+      Без почты и подтверждений. Логин от 3 символов, пароль от 8.
+    </p>
+  </div>
+</div>
+
+<div class="modal-wrap hidden" id="logoutModal">
+  <div class="modal">
+    <button class="modal-x" data-close="logoutModal">×</button>
+    <h2>Выйти из кабинета?</h2>
+    <p class="muted">Для следующего входа понадобятся логин и пароль.</p>
+    <p class="muted small" id="logoutHint">Подтверждение станет доступно через 5 секунд.</p>
+    <label class="check"><input type="checkbox" id="logoutConfirm"> Я помню свой логин и пароль</label>
+    <div class="modal-actions">
+      <button class="btn btn-quiet" data-close="logoutModal">Остаться</button>
+      <button class="btn btn-primary" id="logoutConfirmBtn" disabled>Выйти</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

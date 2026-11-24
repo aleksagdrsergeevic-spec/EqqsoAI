@@ -1,0 +1,9 @@
+.env
+keys.json
+gateway.db
+gateway.db-shm
+gateway.db-wal
+__pycache__/
+*.pyc
+.venv/
+venv/
